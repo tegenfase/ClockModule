@@ -3,6 +3,11 @@
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
+  *
+  * Contains the set-up of the Clock object
+  * Contains interrupt callback functions
+  *
+  *
   ******************************************************************************
   ** This notice applies to any and all portions of this file
   * that are not between comment pairs USER CODE BEGIN and
