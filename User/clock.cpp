@@ -64,8 +64,11 @@ bool Clock::isLocked(void){
 	return lockState;
 }
 void Clock::setPeriod(void){
-	if(clockSource == EXTERNAL){
-			period = masterTimer->Instance->CCR1;
+	if(clockSource == INTERNAL){
+		masterTimer->Instance->CCR2 = period;
+	}
+	else if(clockSource == EXTERNAL){
+	     period = masterTimer->Instance->CCR1;
 	}
 }
 void Clock::setPeriod(unsigned int value){
@@ -101,8 +104,10 @@ void Clock::setSlaveDivision(unsigned int division){
 	subDiv = division;
 	// Bit hacky, to make sure there are only 'division' amounts of pulses in a period.
 	// This may be necessary if a shoddy clock input is used
-	slaveTimer->Instance->CNT = 0;
-	slaveTimer->Instance->ARR = ((period)/division);//+(period%division);
+	slaveTimer->Instance->ARR = (period+10)/16;
+	slaveTimer->Instance->CCR2 = 1000;
+	// slaveTimer->Instance->CNT = 0;
+	// slaveTimer->Instance->ARR = ((period)/division);//+(period%division);
 
 
 }
