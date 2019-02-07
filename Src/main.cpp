@@ -68,6 +68,7 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -88,49 +89,70 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
+		htim2.Instance->CNT = 0;
+		clock.slaveTimer->Instance->CNT = 0;
+
 		if(clock.clockSource==INTERNAL){
-			// clock.slaveTimer->Instance->CNT = 0;
-			// clock.masterTick();
 
 		}
-		else if(clock.clockSource==EXTERNAL){
-			htim2.Instance->CNT = 0;
-			clock.slaveTimer->Instance->CNT = 0;
-			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+
+		if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
+			clock.lock();
+		}
+		else{
+			clock.unlock();
+		}
+
+		if(clock.isLocked()){
 			clock.masterTick();
-			clock.setPeriod();
-			clock.subDiv = 16;
-			clock.slaveTimer->Instance->ARR = (clock.period+10)/16;
-			clock.slaveTimer->Instance->CCR2 = 1000;
+			clock.setPeriod(clock.averagedPeriod);
+			clock.setSlaveDivision(8);
+			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+			HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
+			HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
+		}
+		else{
+			clock.masterTick();
+			clock.setSlaveDivision(8);
 		}
 
+		}
 
-		// HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
-		// HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
-	}
 }
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
+		htim2.Instance->CNT = 0;
+		clock.slaveTimer->Instance->CNT = 0;
+
 		if(clock.clockSource==INTERNAL){
-			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
-			htim2.Instance->CNT = 0;
-			clock.slaveTimer->Instance->CNT = 0;
 			clock.masterTick();
+			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+
 		}
 		else if(clock.clockSource==EXTERNAL){
+			clock.masterTick();
+			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
 		}
 	}
+
 	if(htim->Instance==TIM5){
 		HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_RESET);
 	}
+
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM5){
-		clock.subTick();
-		// HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
+
+		if(clock.isLocked()){
+			clock.subTick();
+			if(!(clock.sub%2)){HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);}
+			// else{HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin, GPIO_PIN_RESET);}
+			if(!(clock.sub%4)){HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_SET);}
+			// else{HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_RESET);}
+		}
 
 	}
 }
@@ -160,7 +182,6 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -171,15 +192,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_OC_Start_IT(&htim5,TIM_CHANNEL_2);
-
-  // HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_1);
+	  // HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_1);
   clock.setTimer(&htim2,&htim5);
   clock.setSource(EXTERNAL);
-  HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
-  clock.setPeriod(1800000);
+  clock.setPeriod(2000000);
   clock.setSlaveDivision(16);
-
-
+  clock.lock();
+	  // HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -191,21 +210,17 @@ int main(void)
   {
 	  if(temp != clock.sub){
 
-
-			if(!(clock.sub%8)){HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);}
-			else{HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin, GPIO_PIN_RESET);}
-
-			if(!(clock.sub%4)){HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_SET);}
-			else{HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_RESET);}
-
-			uint8_t stringTx[16];
-			sprintf((char*)stringTx,"M: %d S: %d\r\n",clock.master,clock.sub);
-			HAL_UART_Transmit(&huart2,stringTx,16,100);
-			temp = clock.sub;
-
+			//if(clock.sub > 15){
+				char stringTx[64];
+				sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.period);
+				HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,64,100);
+				temp = clock.sub;
+			//}
 	  }
 
     /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -305,7 +320,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 10000;
+  sConfigOC.Pulse = 1000000000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_OC_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
@@ -358,7 +373,7 @@ static void MX_TIM5_Init(void)
   }
   sSlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
   sSlaveConfig.InputTrigger = TIM_TS_ITR0;
-  if (HAL_TIM_SlaveConfigSynchronization_IT(&htim5, &sSlaveConfig) != HAL_OK)
+  if (HAL_TIM_SlaveConfigSynchronization(&htim5, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
@@ -369,7 +384,7 @@ static void MX_TIM5_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 10000;
+  sConfigOC.Pulse = 10000000000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_OC_ConfigChannel(&htim5, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)

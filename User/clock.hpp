@@ -29,12 +29,16 @@ enum ClockSource{
 
 class Clock{
 public:
-	unsigned int period, subDiv, master, sub;
-	unsigned char nthMeasurement;
 	TIM_HandleTypeDef* masterTimer;
 	TIM_HandleTypeDef* slaveTimer;
 	ClockSource clockSource;
 	bool lockState;
+
+	unsigned int period, subDiv, master, sub;
+	unsigned int averagedPeriod;
+	int averagingWindow;
+	int sampleIndex;
+
 
 	// Constructor
 	Clock(void);
@@ -43,9 +47,15 @@ public:
 
 	void setTimer(TIM_HandleTypeDef* master, TIM_HandleTypeDef* slave);
 
+	// Add a sampled period to average, returns 0 if result is out of bounds which resets the buffer.
+	// Returns averaged period if the buffer has at least 2 samples.
+	unsigned int addPeriodSample(unsigned int periodSample);
+
 	// Set a period manually
 	void setPeriod(void);
 	void setPeriod(unsigned int value);
+
+	volatile unsigned int getPeriod(void);
 
 	void setSlaveDivision(unsigned int division);
 	void setSource(ClockSource source);
@@ -53,8 +63,6 @@ public:
 	// Increment master clock;
 	void masterTick(void);
 	void subTick(void);
-	// Get averaged period if locked, else return manually defined period
-	volatile unsigned int getPeriod(void);
 
 	// Is the clock locked?
 	void lock(void);
@@ -62,7 +70,13 @@ public:
 	bool isLocked(void);
 
 private:
-	unsigned int hello;
+	float acceptableOutlierPercentage;
+	int acceptableDeviation;
+
+	bool sampleBufferFull;
+	unsigned int sampleBuffer[16];
+
+
 };
 
 
