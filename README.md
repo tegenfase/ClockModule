@@ -15,6 +15,7 @@
 
 - Implement averaging/tap-tempo (DONE!)
 - Have multiple subdivision outputs (MOSTLY WORKING)
+- MIDI (over USB) would be really useful
 - Design user interface
 - Hardware
  - PCB
