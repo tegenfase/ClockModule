@@ -78,13 +78,19 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LD_Pin GPIO_PIN_0
+#define LD_GPIO_Port GPIOC
+#define RCLK_Pin GPIO_PIN_4
+#define RCLK_GPIO_Port GPIOC
+#define SRCLR_Pin GPIO_PIN_5
+#define SRCLR_GPIO_Port GPIOC
 #define OUT1_Pin GPIO_PIN_0
 #define OUT1_GPIO_Port GPIOB
 #define OUT2_Pin GPIO_PIN_1
 #define OUT2_GPIO_Port GPIOB
 #define OUT3_Pin GPIO_PIN_2
 #define OUT3_GPIO_Port GPIOB
-#define OUT4_Pin GPIO_PIN_10
+#define OUT4_Pin GPIO_PIN_4
 #define OUT4_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 

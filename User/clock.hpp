@@ -34,8 +34,10 @@ public:
 	ClockSource clockSource;
 	bool lockState;
 
-	unsigned int period, subDiv, master, sub;
+	volatile unsigned int period, subDiv, master, sub;
 	unsigned int averagedPeriod;
+	unsigned int lastCounterValue;
+
 	int averagingWindow;
 	int sampleIndex;
 

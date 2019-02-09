@@ -25,8 +25,8 @@
 
 // Constructor
 Clock::Clock(){
-	averagingWindow = 16;
-	acceptableOutlierPercentage = 0.1;
+	averagingWindow = 8;
+	acceptableOutlierPercentage = 0.2;
 	;
 }
 // Destructor
@@ -35,6 +35,7 @@ Clock::~Clock(void){
 }
 //
 unsigned int Clock::addPeriodSample(unsigned int periodSample){
+
 	// If the sample buffer has not overflown and this is one of the first samples always add it
 	if((sampleIndex  == 0) && (sampleBufferFull == false)){
 		sampleBuffer[sampleIndex] = periodSample;
@@ -79,7 +80,7 @@ unsigned int Clock::addPeriodSample(unsigned int periodSample){
 		acceptableDeviation = averagedPeriod*acceptableOutlierPercentage;
 		return averagedPeriod;
 	}
-	else if(sampleIndex > 1){
+	else if(sampleIndex > 0){
 		unsigned int temp = 0;
 		for(int i = 0; i < sampleIndex; i++){
 			temp+=sampleBuffer[i];
@@ -100,11 +101,10 @@ void Clock::masterTick(void){
 	sub = 0;
 }
 void Clock::subTick(void){
-	if(sub < subDiv){
-		sub++;
+	if(++sub < subDiv){
 	}
 	else{
-		sub = subDiv;
+	   sub = subDiv;
 	}
 }
 // This should happen in the constructor!
@@ -142,7 +142,7 @@ void Clock::setPeriod(unsigned int value){
 		masterTimer->Instance->CCR2 = period;
 	}
 	else if(clockSource == EXTERNAL){
-		period = masterTimer->Instance->CCR1;
+		period = value;
 		masterTimer->Instance->CCR2 = period;
 	}
 }
@@ -151,12 +151,12 @@ void Clock::setSource(enum ClockSource source){
 	clockSource = source;
 	if(source == INTERNAL){
 		// Do not use the external trigger
-		HAL_TIM_IC_Start_IT(masterTimer, TIM_CHANNEL_1);
+		HAL_TIM_IC_Stop_IT(masterTimer, TIM_CHANNEL_1);
 		HAL_TIM_OC_Start_IT(masterTimer, TIM_CHANNEL_2);
 
 	}
 	else if(source == EXTERNAL){
-		HAL_TIM_OC_Stop_IT(masterTimer, TIM_CHANNEL_2);
+		HAL_TIM_IC_Start_IT(masterTimer, TIM_CHANNEL_2);
 		HAL_TIM_IC_Start_IT(masterTimer, TIM_CHANNEL_1);
 
 	}

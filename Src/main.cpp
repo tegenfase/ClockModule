@@ -50,6 +50,7 @@
 /* USER CODE BEGIN Includes */
 #include "stm32f405xx.h"
 #include "clock.hpp"
+#include "ui.hpp"
 #include <cstring>
 /* USER CODE END Includes */
 
@@ -66,13 +67,17 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi1;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 Clock clock;
+Switches editSwitches(3,4,0,&hspi1);
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -81,6 +86,8 @@ static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_SPI1_Init(void);
+static void MX_TIM10_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,71 +96,98 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN 0 */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
-		htim2.Instance->CNT = 0;
-		clock.slaveTimer->Instance->CNT = 0;
+		static uint32_t lastCounterValue;
+		uint32_t period = TIM2->CCR1-lastCounterValue;
 
-		if(clock.clockSource==INTERNAL){
-
-		}
-
-		if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
+		if(clock.addPeriodSample(period)){
+			clock.masterTick();
 			clock.lock();
+			clock.slaveTimer->Instance->CNT = 0;
+			clock.slaveTimer->Instance->ARR = (clock.averagedPeriod+50)/16;
+			clock.slaveTimer->Instance->CCR2 = 1000;
+			// Set timer 2 channel 2 to trigger after the period has elapsed
+			clock.masterTimer->Instance->CCR2 = TIM2->CNT+clock.averagedPeriod;
 		}
 		else{
 			clock.unlock();
 		}
-
-		if(clock.isLocked()){
-			clock.masterTick();
-			clock.setPeriod(clock.averagedPeriod);
-			clock.setSlaveDivision(8);
-			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
-			HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
-			HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
+		lastCounterValue = TIM2->CNT;
+		/*
+		clock.slaveTimer->Instance->CNT = 0;
+		if(clock.clockSource==INTERNAL){
+			htim2.Instance->CNT = 0;
+			if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
+				clock.masterTick();
+			}
 		}
-		else{
-			clock.masterTick();
-			clock.setSlaveDivision(8);
-		}
+		else if(clock.clockSource==EXTERNAL){
+			// htim2.Instance->CNT = 0;
+			if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
+				clock.lock();
+			}
+			else{
+				clock.unlock();
+			}
 
+			if(clock.isLocked()){
+				clock.masterTick();
+				clock.setPeriod(clock.averagedPeriod);
+				clock.setSlaveDivision(16);
+				HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+				HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+				HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
+			}
+			else{
+				clock.masterTick();
+				clock.setSlaveDivision(16);
+			}
+		}
+				*/
 		}
 
 }
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
-		htim2.Instance->CNT = 0;
-		clock.slaveTimer->Instance->CNT = 0;
-
 		if(clock.clockSource==INTERNAL){
-			clock.masterTick();
-			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+			// htim2.Instance->CNT = 0;
+			// clock.slaveTimer->Instance->CNT = 0;
+			// clock.masterTick();
+			// HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+			// HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
+			// HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
 
 		}
 		else if(clock.clockSource==EXTERNAL){
-			clock.masterTick();
-			HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
+			if(clock.isLocked()){
+				clock.masterTick();
+				clock.slaveTimer->Instance->CNT = 0;
+				clock.masterTimer->Instance->CCR2 = TIM2->CNT+clock.averagedPeriod;
+			}
 		}
 	}
 
 	if(htim->Instance==TIM5){
+
 		HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_RESET);
 	}
-
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM5){
-
 		if(clock.isLocked()){
-			clock.subTick();
-			if(!(clock.sub%2)){HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);}
-			// else{HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin, GPIO_PIN_RESET);}
-			if(!(clock.sub%4)){HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_SET);}
-			// else{HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_RESET);}
+		if(clock.sub==0){HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);}
+		if(!(clock.sub%4)){HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);}
+		if(!(clock.sub%8)){HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_SET);}
+		clock.subTick();
 		}
-
+	}
+	// Update gui
+	if(htim->Instance==TIM10){
+		editSwitches.update(clock.sub);
+		editSwitches.spi();
+		TIM10->CNT=0;
 	}
 }
 
@@ -189,6 +223,8 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM5_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_OC_Start_IT(&htim5,TIM_CHANNEL_2);
@@ -197,8 +233,13 @@ int main(void)
   clock.setSource(EXTERNAL);
   clock.setPeriod(2000000);
   clock.setSlaveDivision(16);
-  clock.lock();
+  // clock.lock();
 	  // HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
+
+  HAL_TIM_Base_Start_IT(&htim10);
+  shiftRegInit();
+  editSwitches.setLedAll(FULL,PULSE_MODE_8TH);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -212,7 +253,7 @@ int main(void)
 
 			//if(clock.sub > 15){
 				char stringTx[64];
-				sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.period);
+				sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.averagedPeriod);
 				HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,64,100);
 				temp = clock.sub;
 			//}
@@ -261,6 +302,44 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
 }
 
 /**
@@ -320,7 +399,7 @@ static void MX_TIM2_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 1000000000;
+  sConfigOC.Pulse = 10000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_OC_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
@@ -384,7 +463,7 @@ static void MX_TIM5_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 10000000000;
+  sConfigOC.Pulse = 10000;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_OC_ConfigChannel(&htim5, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
@@ -394,6 +473,36 @@ static void MX_TIM5_Init(void)
   /* USER CODE BEGIN TIM5_Init 2 */
 
   /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
+  * @brief TIM10 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM10_Init(void)
+{
+
+  /* USER CODE BEGIN TIM10_Init 0 */
+
+  /* USER CODE END TIM10_Init 0 */
+
+  /* USER CODE BEGIN TIM10_Init 1 */
+
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 16;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 250;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM10_Init 2 */
+
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -440,11 +549,22 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, LD_Pin|RCLK_Pin|SRCLR_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : LD_Pin RCLK_Pin SRCLR_Pin */
+  GPIO_InitStruct.Pin = LD_Pin|RCLK_Pin|SRCLR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OUT1_Pin OUT2_Pin OUT3_Pin OUT4_Pin */
   GPIO_InitStruct.Pin = OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin;
