@@ -1,14 +1,14 @@
 main.cpp:97:6:void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef*)	24	static
-main.cpp:149:6:void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef*)	16	static
-main.cpp:184:6:void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef*)	16	static
-main.cpp:210:5:int main()	88	static
-main.cpp:283:6:void SystemClock_Config()	88	static
-main.cpp:322:13:void MX_SPI1_Init()	8	static
-main.cpp:360:13:void MX_TIM2_Init()	80	static
-main.cpp:430:13:void MX_TIM5_Init()	80	static
-main.cpp:494:13:void MX_TIM10_Init()	8	static
-main.cpp:524:13:void MX_USART2_UART_Init()	8	static
-main.cpp:557:13:void MX_GPIO_Init()	40	static
-main.cpp:596:6:void Error_Handler()	4	static
-main.cpp:602:1:void __static_initialization_and_destruction_0(int, int)	24	static
-main.cpp:602:1:cpp)	8	static
+main.cpp:157:6:void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef*)	16	static
+main.cpp:187:6:void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef*)	16	static
+main.cpp:210:5:int main()	128	static
+main.cpp:285:6:void SystemClock_Config()	88	static
+main.cpp:324:13:void MX_SPI1_Init()	8	static
+main.cpp:362:13:void MX_TIM2_Init()	80	static
+main.cpp:432:13:void MX_TIM5_Init()	80	static
+main.cpp:496:13:void MX_TIM10_Init()	8	static
+main.cpp:526:13:void MX_USART2_UART_Init()	8	static
+main.cpp:559:13:void MX_GPIO_Init()	40	static
+main.cpp:598:6:void Error_Handler()	4	static
+main.cpp:604:1:void __static_initialization_and_destruction_0(int, int)	24	static
+main.cpp:604:1:cpp)	8	static

@@ -99,6 +99,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		static uint32_t lastCounterValue;
 		uint32_t period = TIM2->CCR1-lastCounterValue;
 
+		// After an hour or so the 32bit CNT register will overflow, we should mitigate this
+		if(TIM2->CNT > 4000000000UL){
+			TIM2->CNT = 0;
+			lastCounterValue = 0;
+		}else{lastCounterValue = TIM2->CNT;}
+
+		// Average the difference between CNT values, after 2 inputs "lock" the clock enabling outputs
+		// This will set the TIM5 timebase and the TIM2 channel 2 timebase.
 		if(clock.addPeriodSample(period)){
 			clock.masterTick();
 			clock.lock();
@@ -111,7 +119,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		else{
 			clock.unlock();
 		}
-		lastCounterValue = TIM2->CNT;
+
 		/*
 		clock.slaveTimer->Instance->CNT = 0;
 		if(clock.clockSource==INTERNAL){
@@ -158,11 +166,13 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim){
 
 		}
 		else if(clock.clockSource==EXTERNAL){
+			// When no tempo is being tapped/clocked in this will be the main time base
 			if(clock.isLocked()){
 				clock.masterTick();
 				clock.slaveTimer->Instance->CNT = 0;
 				clock.masterTimer->Instance->CCR2 = TIM2->CNT+clock.averagedPeriod;
 			}
+
 		}
 	}
 
@@ -185,9 +195,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	}
 	// Update gui
 	if(htim->Instance==TIM10){
+		TIM10->CNT=0;
 		editSwitches.update(clock.sub);
 		editSwitches.spi();
-		TIM10->CNT=0;
 	}
 }
 
@@ -237,26 +247,28 @@ int main(void)
 	  // HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
 
   HAL_TIM_Base_Start_IT(&htim10);
+
   shiftRegInit();
   editSwitches.setLedAll(FULL,PULSE_MODE_8TH);
 
+  char stringTx[32];
+  sprintf((char*)stringTx,"HELLO WORLD!");
+  HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,32,10);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
- int  temp;
+ unsigned int temp;
 
   while (1)
   {
 	  if(temp != clock.sub){
-
-			//if(clock.sub > 15){
-				char stringTx[64];
-				sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.averagedPeriod);
-				HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,64,100);
-				temp = clock.sub;
-			//}
+			char stringTx[64];
+			stringTx[0]='\0';
+			sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.averagedPeriod);
+			HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,64,100);
+			temp = clock.sub;
 	  }
 
     /* USER CODE END WHILE */
@@ -365,7 +377,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 15;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4000000000;
+  htim2.Init.Period = 4000000000UL;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -435,7 +447,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 15;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 4000000000;
+  htim5.Init.Period = 4000000000UL;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
   {
@@ -494,7 +506,7 @@ static void MX_TIM10_Init(void)
   htim10.Instance = TIM10;
   htim10.Init.Prescaler = 16;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 250;
+  htim10.Init.Period = 1000;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
