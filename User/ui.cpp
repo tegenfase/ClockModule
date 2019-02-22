@@ -8,7 +8,6 @@
 #include "ui.hpp"
 #include "stm32f4xx_hal.h"
 
-
 uint8_t ui_spi_in[NUM_OF_REGISTERS];
 uint8_t ui_spi_out[NUM_OF_REGISTERS];
 
@@ -48,13 +47,14 @@ void Switches::spi(void){
 		// HAL_GPIO_WritePin(SRCLR_GPIO_Port,SRCLR_Pin,GPIO_PIN_SET);
 
 		// Latch inputs
-		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_SET);
+
 
 
 		HAL_SPI_TransmitReceive(spi_interface, ui_spi_out, ui_spi_in, NUM_OF_REGISTERS, 10);
 
 		// Transfer shift register contents to storage register
+		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_SET);
 		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
 }
@@ -65,7 +65,7 @@ void Switches::update(int subTick){
 	uint8_t i, x, j;
 	static uint8_t PWMcounter;
 	int shift;
-	uint8_t step = subTick;
+	uint8_t step = subTick/12;
 
 	PWMcounter++;
 	for(x = 0; x < numOfRegisters; x++){
@@ -74,17 +74,18 @@ void Switches::update(int subTick){
 			shift = (x*8)+j;
 
 			if(ledPulse[shift]){
-				if(!(step%ledPulse[shift])){
+				if((step%ledPulse[shift])){
 					if(PWMcounter<ledPWM[shift]){
 						ledMask[x] |= (1 << j);
 					}
 					else{
-						ledMask[x] &= ~(1 << j);
+						ledMask[x] |= (1 << j);
+						// ledMask[x] &= ~(1 << j);
 					}
 				}
 				else{
-
-					ledMask[x] &= ~(1 << j);
+					ledMask[x] |= (1 << j);
+					// ledMask[x] &= ~(1 << j);
 				}
 			}
 			else{
@@ -92,6 +93,7 @@ void Switches::update(int subTick){
 					ledMask[x] |= (1 << j);
 				}
 				else{
+					//ledMask[x] |= (1 << j);
 					ledMask[x] &= ~(1 << j);
 				}
 
@@ -185,10 +187,10 @@ void Switches::currentState(uint8_t* state){
 		*(state+i) = debouncedState[i];
 	}
 }
-inline void Switches::setLed(int n, PWM_MODE pwm){
+void Switches::setLed(int n, PWM_MODE pwm){
 	ledPWM[n] = pwm;
 }
-inline void Switches::setLed(int n, PWM_MODE pwm, PULSE_MODE pulse){
+void Switches::setLed(int n, PWM_MODE pwm, PULSE_MODE pulse){
 	ledPWM[n] = pwm;
 	ledPulse[n] = pulse;
 }

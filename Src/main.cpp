@@ -50,6 +50,7 @@
 /* USER CODE BEGIN Includes */
 #include "stm32f405xx.h"
 #include "clock.hpp"
+#include "sequencer.hpp"
 #include "ui.hpp"
 #include <cstring>
 /* USER CODE END Includes */
@@ -77,7 +78,8 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 Clock clock;
-Switches editSwitches(3,4,0,&hspi1);
+Sequencer sequencer(1,2,2,0,&hspi1);
+// Switches editSwitches(3,4,0,&hspi1);
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -119,50 +121,15 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 		else{
 			clock.unlock();
 		}
-
-		/*
-		clock.slaveTimer->Instance->CNT = 0;
-		if(clock.clockSource==INTERNAL){
-			htim2.Instance->CNT = 0;
-			if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
-				clock.masterTick();
-			}
-		}
-		else if(clock.clockSource==EXTERNAL){
-			// htim2.Instance->CNT = 0;
-			if(clock.addPeriodSample(clock.masterTimer->Instance->CCR1)){
-				clock.lock();
-			}
-			else{
-				clock.unlock();
-			}
-
-			if(clock.isLocked()){
-				clock.masterTick();
-				clock.setPeriod(clock.averagedPeriod);
-				clock.setSlaveDivision(16);
-				HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
-				HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
-				HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
-			}
-			else{
-				clock.masterTick();
-				clock.setSlaveDivision(16);
-			}
-		}
-				*/
-		}
-
+	}
 }
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM2){
 		if(clock.clockSource==INTERNAL){
-			// htim2.Instance->CNT = 0;
-			// clock.slaveTimer->Instance->CNT = 0;
-			// clock.masterTick();
-			// HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);
-			// HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);
-			// HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_SET);
+			clock.lock();
+			clock.masterTick();
+			clock.slaveTimer->Instance->CNT = 0;
+			clock.masterTimer->Instance->CCR2 = TIM2->CNT+clock.period;
 
 		}
 		else if(clock.clockSource==EXTERNAL){
@@ -175,29 +142,28 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim){
 
 		}
 	}
-
 	if(htim->Instance==TIM5){
-
-		HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_RESET);
+		// HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_RESET);
+		// HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_RESET);
+		// HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin,GPIO_PIN_RESET);
 	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance==TIM5){
 		if(clock.isLocked()){
-		if(clock.sub==0){HAL_GPIO_WritePin(OUT1_GPIO_Port,OUT1_Pin,GPIO_PIN_SET);}
-		if(!(clock.sub%4)){HAL_GPIO_WritePin(OUT2_GPIO_Port,OUT2_Pin,GPIO_PIN_SET);}
-		if(!(clock.sub%8)){HAL_GPIO_WritePin(OUT3_GPIO_Port,OUT3_Pin, GPIO_PIN_SET);}
-		clock.subTick();
+			sequencer.subStepAdvance(&clock);
+			sequencer.writeTrigPattern();
+			clock.subTick();
+
 		}
 	}
 	// Update gui
 	if(htim->Instance==TIM10){
-		TIM10->CNT=0;
-		editSwitches.update(clock.sub);
-		editSwitches.spi();
+		sequencer.stepSwitches.update(clock.sub);
+		sequencer.menuSwitches.update(clock.sub);
+		sequencer.readWrite();
+		sequencer.stepSwitches.spi();
 	}
 }
 
@@ -236,20 +202,19 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
+
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_OC_Start_IT(&htim5,TIM_CHANNEL_2);
-	  // HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_1);
+
   clock.setTimer(&htim2,&htim5);
-  clock.setSource(EXTERNAL);
-  clock.setPeriod(2000000);
-  clock.setSlaveDivision(16);
-  // clock.lock();
-	  // HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
+  clock.setSource(INTERNAL);
+  clock.setPeriod(1000000);
+  clock.setSlaveDivision(384);
 
   HAL_TIM_Base_Start_IT(&htim10);
 
   shiftRegInit();
-  editSwitches.setLedAll(FULL,PULSE_MODE_8TH);
+  // editSwitches.setLedAll(FULL,PULSE_MODE_8TH);
 
   char stringTx[32];
   sprintf((char*)stringTx,"HELLO WORLD!");
@@ -296,7 +261,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -305,12 +275,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV4;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -339,7 +309,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -375,9 +345,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 15;
+  htim2.Init.Prescaler = 41;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4000000000UL;
+  htim2.Init.Period = 4000000000;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -445,9 +415,9 @@ static void MX_TIM5_Init(void)
 
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 15;
+  htim5.Init.Prescaler = 41;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 4000000000UL;
+  htim5.Init.Period = 4000000000;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
   {
@@ -504,9 +474,9 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 16;
+  htim10.Init.Prescaler = 41;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim10.Init.Period = 1000;
+  htim10.Init.Period = 800;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
