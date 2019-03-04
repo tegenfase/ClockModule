@@ -20,9 +20,9 @@ void shiftRegInit(void);
 
 enum PWM_MODE{
 	OFF = 0,
-	DIM = 2,
-	HALF = 25,
-	FULL = 127
+	DIM = 5,
+	HALF = 32,
+	FULL = 64
 };
 
 enum PULSE_MODE{

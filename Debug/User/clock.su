@@ -3,12 +3,12 @@ clock.cpp:33:1:Clock::~Clock()	16	static
 clock.cpp:37:14:unsigned int Clock::addPeriodSample(unsigned int)	40	static
 clock.cpp:99:6:void Clock::masterTick()	16	static
 clock.cpp:103:6:void Clock::subTick()	16	static
-clock.cpp:111:6:void Clock::setTimer(TIM_HandleTypeDef*, TIM_HandleTypeDef*)	24	static
-clock.cpp:118:6:void Clock::lock()	16	static
-clock.cpp:124:6:void Clock::unlock()	16	static
-clock.cpp:127:6:bool Clock::isLocked()	16	static
-clock.cpp:130:6:void Clock::setPeriod()	16	static
-clock.cpp:139:6:void Clock::setPeriod(unsigned int)	16	static
-clock.cpp:150:6:void Clock::setSource(ClockSource)	16	static
-clock.cpp:164:23:volatile unsigned int Clock::getPeriod()	16	static
-clock.cpp:168:6:void Clock::setSlaveDivision(unsigned int)	16	static
+clock.cpp:112:6:void Clock::setTimer(TIM_HandleTypeDef*, TIM_HandleTypeDef*)	24	static
+clock.cpp:119:6:void Clock::lock()	16	static
+clock.cpp:125:6:void Clock::unlock()	16	static
+clock.cpp:128:6:bool Clock::isLocked()	16	static
+clock.cpp:131:6:void Clock::setPeriod()	16	static
+clock.cpp:140:6:void Clock::setPeriod(unsigned int)	16	static
+clock.cpp:151:6:void Clock::setSource(ClockSource)	16	static
+clock.cpp:165:23:volatile unsigned int Clock::getPeriod()	16	static
+clock.cpp:169:6:void Clock::setSlaveDivision(unsigned int)	16	static

@@ -52,6 +52,8 @@
 #include "clock.hpp"
 #include "sequencer.hpp"
 #include "ui.hpp"
+#include "OLED_Driver.h"
+#include "OLED_GUI.h"
 #include <cstring>
 /* USER CODE END Includes */
 
@@ -68,7 +70,10 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
@@ -90,6 +95,8 @@ static void MX_TIM5_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM10_Init(void);
+static void MX_SPI2_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -109,7 +116,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 
 		// Average the difference between CNT values, after 2 inputs "lock" the clock enabling outputs
 		// This will set the TIM5 timebase and the TIM2 channel 2 timebase.
-		if(clock.addPeriodSample(period)){
+		if (clock.addPeriodSample(period)) {
 			clock.masterTick();
 			clock.lock();
 			clock.slaveTimer->Instance->CNT = 0;
@@ -156,14 +163,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			sequencer.writeTrigPattern();
 			clock.subTick();
 
+			// char stringTx[32];
+			// stringTx[0]='\0';
+			// sprintf((char*)stringTx," M: %d S: %d \r",clock.master,clock.sub);
+			// HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,strlen(stringTx),100);
+
 		}
 	}
 	// Update gui
 	if(htim->Instance==TIM10){
+		sequencer.stepSwitches.spi();
+		sequencer.readWrite();
 		sequencer.stepSwitches.update(clock.sub);
 		sequencer.menuSwitches.update(clock.sub);
-		sequencer.readWrite();
-		sequencer.stepSwitches.spi();
 	}
 }
 
@@ -201,6 +213,8 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM10_Init();
+  MX_SPI2_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start_IT(&htim5);
@@ -208,8 +222,8 @@ int main(void)
 
   clock.setTimer(&htim2,&htim5);
   clock.setSource(INTERNAL);
-  clock.setPeriod(1000000);
-  clock.setSlaveDivision(384);
+  clock.setPeriod(5000000);
+  clock.setSlaveDivision(192);
 
   HAL_TIM_Base_Start_IT(&htim10);
 
@@ -219,6 +233,28 @@ int main(void)
   char stringTx[32];
   sprintf((char*)stringTx,"HELLO WORLD!");
   HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,32,10);
+
+  System_Init();
+
+  OLED_Init(SCAN_DIR_DFT);//SCAN_DIR_DFT = D2U_L2R
+
+  GUI_DrawRectangle(1,1,30,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DisString_EN(5, 5, "PLAY", &Font8, FONT_BACKGROUND, WHITE);
+
+  GUI_DrawRectangle(32,1,62,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DrawRectangle(64,1,94,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DrawRectangle(96,1,126,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+
+  GUI_DrawRectangle(1,32,30,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DrawRectangle(32,32,62,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DrawRectangle(64,32,94,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+  GUI_DrawRectangle(96,32,126,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
+
+  GUI_DisString_EN(5 , 52, "DELTRONIX", &Font8, FONT_BACKGROUND, WHITE);
+
+
+  OLED_Display();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -228,13 +264,20 @@ int main(void)
 
   while (1)
   {
-	  if(temp != clock.sub){
-			char stringTx[64];
+	  if((temp != clock.sub)){
+			char stringTx[32];
+
+			if (!clock.sub){
+			OLED_ClearWindow(0,60,127,90,0);
 			stringTx[0]='\0';
-			sprintf((char*)stringTx," M: %d S: %d P: %d \r",clock.master,clock.sub,clock.averagedPeriod);
-			HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,64,100);
-			temp = clock.sub;
+			sprintf((char*)stringTx," M: %d S: %d",clock.master,clock.sub);
+			GUI_DisString_EN(5,62, stringTx, &Font8, FONT_BACKGROUND, WHITE);
+
+			OLED_DisWindow(0, 60, 127, 90);
+			}
 	  }
+
+
 
     /* USER CODE END WHILE */
 
@@ -287,6 +330,40 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief SPI1 Initialization Function
   * @param None
   * @retval None
@@ -309,7 +386,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -321,6 +398,44 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -539,7 +654,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, LD_Pin|RCLK_Pin|SRCLR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, OUT1_Pin|OUT2_Pin|OUT3_Pin|OLED_DC_Pin 
+                          |OLED_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : LD_Pin RCLK_Pin SRCLR_Pin */
   GPIO_InitStruct.Pin = LD_Pin|RCLK_Pin|SRCLR_Pin;
@@ -548,8 +664,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : OUT1_Pin OUT2_Pin OUT3_Pin OUT4_Pin */
-  GPIO_InitStruct.Pin = OUT1_Pin|OUT2_Pin|OUT3_Pin|OUT4_Pin;
+  /*Configure GPIO pins : OUT1_Pin OUT2_Pin OUT3_Pin OLED_DC_Pin 
+                           OLED_RST_Pin */
+  GPIO_InitStruct.Pin = OUT1_Pin|OUT2_Pin|OUT3_Pin|OLED_DC_Pin 
+                          |OLED_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

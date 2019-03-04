@@ -53,10 +53,14 @@ void Switches::spi(void){
 		HAL_SPI_TransmitReceive(spi_interface, ui_spi_out, ui_spi_in, NUM_OF_REGISTERS, 10);
 
 		// Transfer shift register contents to storage register
+
+		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
+
+		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_SET);
-		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
+
+
 }
 void Switches::update(int subTick){
 
@@ -67,28 +71,34 @@ void Switches::update(int subTick){
 	int shift;
 	uint8_t step = subTick/12;
 
-	PWMcounter++;
+	if(++PWMcounter >= 64){
+		PWMcounter = 1;
+	}
+
+
+
 	for(x = 0; x < numOfRegisters; x++){
 		// Dim and pulse leds
 		for(j = 0; j<8; j++){
 			shift = (x*8)+j;
 
 			if(ledPulse[shift]){
-				if((step%ledPulse[shift])){
+				if(!(step%ledPulse[shift])){
 					if(PWMcounter<ledPWM[shift]){
+
 						ledMask[x] |= (1 << j);
 					}
 					else{
-						ledMask[x] |= (1 << j);
-						// ledMask[x] &= ~(1 << j);
+						ledMask[x] &= ~(1 << j);
+
 					}
 				}
 				else{
-					ledMask[x] |= (1 << j);
-					// ledMask[x] &= ~(1 << j);
+					// ledMask[x] |= (1 << j);
+					ledMask[x] &= ~(1 << j);
 				}
 			}
-			else{
+			else if(ledPWM[shift]){
 				if(PWMcounter<ledPWM[shift]){
 					ledMask[x] |= (1 << j);
 				}
@@ -96,16 +106,18 @@ void Switches::update(int subTick){
 					//ledMask[x] |= (1 << j);
 					ledMask[x] &= ~(1 << j);
 				}
-
 			}
+			else{
+					//ledMask[x] |= (1 << j);
+					ledMask[x] &= ~(1 << j);
+			}
+
 		}
 
-		if(PWMcounter == 127){
-			PWMcounter = 0;
-		}
+
 
 		// Push ledstate to spi out buffer
-		ui_spi_out[NUM_OF_REGISTERS-(1+offset+x)] = leds[x] | ledMask[x];
+		ui_spi_out[NUM_OF_REGISTERS-(1+offset+x)] = ledMask[x];
 
 		lastDebouncedState[x] = debouncedState[x];
 		debouncedState[x] = 0xFF;

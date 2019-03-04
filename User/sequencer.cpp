@@ -47,29 +47,29 @@ void Sequencer::readWrite(void){
 							break;
 						case SELECT_BLOCK:
 							menuSwitches.setLedByte(0,SELECT_BLOCK|SELECT_LANE|SELECT_NOTE|SELECT_SONG,OFF, PULSE_MODE_OFF);
-							menuSwitches.setLedByte(0,SELECT_BLOCK,FULL,PULSE_MODE_4TH);
+							menuSwitches.setLedByte(0,SELECT_BLOCK,HALF,PULSE_MODE_4TH);
 							stepSwitches.setLedAll(OFF,PULSE_MODE_OFF);
-							stepSwitches.setLed(playingBlock, FULL, PULSE_MODE_4TH);
+							stepSwitches.setLed(playingBlock, HALF, PULSE_MODE_4TH);
 							stepSwitchMode = STEPSWITCH_SELECT_BLOCK;
 							break;
 						case SELECT_LANE:
 							menuSwitches.setLedByte(0,SELECT_BLOCK|SELECT_LANE|SELECT_NOTE|SELECT_SONG,OFF,PULSE_MODE_OFF);
-							menuSwitches.setLedByte(0,SELECT_LANE,FULL,PULSE_MODE_8TH);
+							menuSwitches.setLedByte(0,SELECT_LANE,HALF,PULSE_MODE_8TH);
 							stepSwitchMode = STEPSWITCH_SELECT_LANE;
 							stepSwitches.setLedAll(OFF,PULSE_MODE_OFF);
-							stepSwitches.setLed(selectedLane, FULL, PULSE_MODE_8TH);
+							stepSwitches.setLed(selectedLane, HALF, PULSE_MODE_8TH);
 							break;
 						case SELECT_NOTE:
 							menuSwitches.setLedByte(0,SELECT_BLOCK|SELECT_LANE|SELECT_NOTE|SELECT_SONG,OFF,PULSE_MODE_OFF);
-							menuSwitches.setLedByte(0,SELECT_NOTE,FULL,PULSE_MODE_16TH);
+							menuSwitches.setLedByte(0,SELECT_NOTE,HALF,PULSE_MODE_16TH);
 							stepSwitchMode = STEPSWITCH_SELECT_NOTE;
 							stepSwitches.setLedAll(OFF,PULSE_MODE_OFF);
-							stepSwitches.setLed(selectedStep, FULL, PULSE_MODE_16TH);
+							stepSwitches.setLed(selectedStep, HALF, PULSE_MODE_16TH);
 							break;
 						case SELECT_SONG:
 							stepSwitchMode = STEPSWITCH_SELECT_SONG;
 							stepSwitches.setLedAll(OFF,PULSE_MODE_OFF);
-							stepSwitches.setLed(selectedSong, FULL, PULSE_MODE_2ND);
+							stepSwitches.setLed(selectedSong, HALF, PULSE_MODE_2ND);
 							break;
 						default:
 							break;
@@ -129,7 +129,7 @@ void Sequencer::readWrite(void){
 				}
 				else if(song[selectedSong].subSteps[selectedLane][selectedBlock][step]){
 					if(step == selectedStep){
-						stepSwitches.setLed(selectedStep,HALF,PULSE_MODE_OFF);
+						stepSwitches.setLed(selectedStep,HALF,PULSE_MODE_8TH);
 					}
 					else{
 						stepSwitches.setLed(step,HALF);
@@ -155,7 +155,7 @@ void Sequencer::subStepAdvance(Clock* clock){
 	char uartBuffer[16];
 	switch(transportState){
 	case TRANSPORT_STATE_PLAY:
-		song[playingSong].activeSubStep=clock->sub%24;
+		song[playingSong].activeSubStep=clock->sub%12;
 		if(clock->sub == 0){
 			playingBlock = selectedBlock;
 		}
@@ -167,10 +167,12 @@ void Sequencer::subStepAdvance(Clock* clock){
 				}
 			}
 		}
+		/*
 		sprintf(uartBuffer,"%c%c%c",'S',clock->sub%24,clock->sub/24);
 		HAL_UART_Transmit(&huart2,(uint8_t*)uartBuffer,3,10);
 		sprintf(uartBuffer,"%c%c",'M',clock->master);
 		HAL_UART_Transmit(&huart2,(uint8_t*)uartBuffer,2,10);
+		*/
 		break;
 	case TRANSPORT_STATE_RESET:
 		if(clock->isLocked()){
@@ -194,7 +196,6 @@ void Sequencer::subStepAdvance(Clock* clock){
 		break;
 	}
 }
-
 void Sequencer::writeTrigPattern(void){
 	uint8_t step;
 

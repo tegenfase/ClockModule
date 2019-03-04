@@ -1,4 +1,4 @@
-# ClockModule
+#ClockModule
 
  - STM32 based clock divider and multiplier
    - EXTERNAL mode:
@@ -10,7 +10,7 @@
      - TIM5's period is set manually
      - TIM2 is used in OC mode on channel 2 for the masterTick();
  - Proving ground for the timing code to be used in the ControlModule
- 
+
 ## TODO:
 
 - Implement averaging/tap-tempo (DONE!)

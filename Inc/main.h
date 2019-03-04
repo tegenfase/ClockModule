@@ -74,7 +74,8 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+extern I2C_HandleTypeDef hi2c1;
+extern SPI_HandleTypeDef hspi2;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -90,8 +91,10 @@ void Error_Handler(void);
 #define OUT2_GPIO_Port GPIOB
 #define OUT3_Pin GPIO_PIN_2
 #define OUT3_GPIO_Port GPIOB
-#define OUT4_Pin GPIO_PIN_4
-#define OUT4_GPIO_Port GPIOB
+#define OLED_DC_Pin GPIO_PIN_4
+#define OLED_DC_GPIO_Port GPIOB
+#define OLED_RST_Pin GPIO_PIN_5
+#define OLED_RST_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

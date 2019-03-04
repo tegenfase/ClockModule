@@ -102,9 +102,10 @@ void Clock::masterTick(void){
 }
 void Clock::subTick(void){
 	if(++sub < subDiv){
+		;
 	}
 	else{
-	   sub = subDiv;
+	   sub = 0;
 	}
 }
 // This should happen in the constructor!
