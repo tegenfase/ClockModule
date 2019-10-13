@@ -27,6 +27,7 @@
 Clock::Clock(){
 	averagingWindow = 8;
 	acceptableOutlierPercentage = 0.2;
+	subMult = 1;
 	;
 }
 // Destructor
@@ -97,8 +98,14 @@ unsigned int Clock::addPeriodSample(unsigned int periodSample){
 	}
 }
 void Clock::masterTick(void){
-	master++;
-	sub = 0;
+	if(master<subMult){
+		master++;
+	}
+	else{
+		master = 0;
+		sub = 0;
+	}
+
 }
 void Clock::subTick(void){
 	if(++sub < subDiv){
@@ -159,11 +166,15 @@ void Clock::setSource(enum ClockSource source){
 	else if(source == EXTERNAL){
 		HAL_TIM_IC_Start_IT(masterTimer, TIM_CHANNEL_2);
 		HAL_TIM_IC_Start_IT(masterTimer, TIM_CHANNEL_1);
-
 	}
 }
 volatile unsigned int Clock::getPeriod(void){
 	return period;
+}
+void Clock::setSlaveMultiplier(unsigned int multiplier){
+	subMult = multiplier;
+
+
 }
 
 void Clock::setSlaveDivision(unsigned int division){

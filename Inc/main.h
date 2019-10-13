@@ -79,22 +79,32 @@ extern SPI_HandleTypeDef hspi2;
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define LD_Pin GPIO_PIN_0
-#define LD_GPIO_Port GPIOC
+#define ENC1A_Pin GPIO_PIN_0
+#define ENC1A_GPIO_Port GPIOC
+#define ENC1B_Pin GPIO_PIN_1
+#define ENC1B_GPIO_Port GPIOC
+#define USART2_TX_Pin GPIO_PIN_2
+#define USART2_TX_GPIO_Port GPIOA
+#define USART2_RX_Pin GPIO_PIN_3
+#define USART2_RX_GPIO_Port GPIOA
 #define RCLK_Pin GPIO_PIN_4
 #define RCLK_GPIO_Port GPIOC
-#define SRCLR_Pin GPIO_PIN_5
-#define SRCLR_GPIO_Port GPIOC
 #define OUT1_Pin GPIO_PIN_0
 #define OUT1_GPIO_Port GPIOB
 #define OUT2_Pin GPIO_PIN_1
 #define OUT2_GPIO_Port GPIOB
 #define OUT3_Pin GPIO_PIN_2
 #define OUT3_GPIO_Port GPIOB
-#define OLED_DC_Pin GPIO_PIN_4
-#define OLED_DC_GPIO_Port GPIOB
-#define OLED_RST_Pin GPIO_PIN_5
-#define OLED_RST_GPIO_Port GPIOB
+#define DISP_RST_Pin GPIO_PIN_10
+#define DISP_RST_GPIO_Port GPIOB
+#define DISP_A0_Pin GPIO_PIN_11
+#define DISP_A0_GPIO_Port GPIOB
+#define DISP_CS_Pin GPIO_PIN_12
+#define DISP_CS_GPIO_Port GPIOB
+#define SPI3_RCLK_Pin GPIO_PIN_14
+#define SPI3_RCLK_GPIO_Port GPIOA
+#define SPI3_DAC_SYNC_Pin GPIO_PIN_15
+#define SPI3_DAC_SYNC_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

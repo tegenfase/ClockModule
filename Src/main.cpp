@@ -49,16 +49,21 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32f405xx.h"
+#include "usb_device.h"
+#include "usbd_midi_if.h"
 #include "clock.hpp"
+#include "io.hpp"
 #include "sequencer.hpp"
 #include "ui.hpp"
-#include "OLED_Driver.h"
-#include "OLED_GUI.h"
+#include "dog_7565R.hpp"
+#include "fonts/font_8x16.h"
+#include "fonts/font_6x8.h"
 #include <cstring>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -74,16 +79,21 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
+SPI_HandleTypeDef hspi3;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 Clock clock;
-Sequencer sequencer(1,2,2,0,&hspi1);
+Sequencer sequencer(2,2,2,0,&hspi1);
+Encoder encoder(8);
+IO io(&hspi3);
+dog_7565R display;
 // Switches editSwitches(3,4,0,&hspi1);
 /* USER CODE END PV */
 
@@ -97,6 +107,8 @@ static void MX_SPI1_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_SPI3_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -116,12 +128,13 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim){
 
 		// Average the difference between CNT values, after 2 inputs "lock" the clock enabling outputs
 		// This will set the TIM5 timebase and the TIM2 channel 2 timebase.
-		if (clock.addPeriodSample(period)) {
+		if (clock.addPeriodSample(period)){
 			clock.masterTick();
 			clock.lock();
-			clock.slaveTimer->Instance->CNT = 0;
-			clock.slaveTimer->Instance->ARR = (clock.averagedPeriod+50)/16;
-			clock.slaveTimer->Instance->CCR2 = 1000;
+
+			//clock.slaveTimer->Instance->ARR = (period+50)*24;
+			clock.slaveTimer->Instance->ARR = (clock.averagedPeriod+50);
+			// clock.slaveTimer->Instance->CCR2 = 1000;
 			// Set timer 2 channel 2 to trigger after the period has elapsed
 			clock.masterTimer->Instance->CCR2 = TIM2->CNT+clock.averagedPeriod;
 		}
@@ -163,12 +176,33 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			sequencer.writeTrigPattern();
 			clock.subTick();
 
-			// char stringTx[32];
-			// stringTx[0]='\0';
-			// sprintf((char*)stringTx," M: %d S: %d \r",clock.master,clock.sub);
-			// HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,strlen(stringTx),100);
+			char stringTx[32];
+			stringTx[0]='\0';
+			sprintf((char*)stringTx,"ENC:%d M:%d S:%d\r",encoder.counter,clock.master,clock.sub);
+			display.string(7,0,font_6x8,stringTx);
+			//HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,strlen(stringTx),100);
+			  uint8_t dat_out[2];
+			  static uint16_t dac_out = 0;
+			  dac_out+=5461;
+			  dat_out[0]++;
+			  dat_out[1]--;
+			  HAL_GPIO_WritePin(SPI3_DAC_SYNC_GPIO_Port, SPI3_DAC_SYNC_Pin,GPIO_PIN_SET);
+			  io.setDacRegister(DAC_REGISTER,DAC_CHANNEL_A,dac_out);
+			  io.setDacRegister(DAC_REGISTER,DAC_CHANNEL_B,dac_out);
+			  io.setDacRegister(DAC_REGISTER,DAC_CHANNEL_C,dac_out);
+			  io.setDacRegister(DAC_REGISTER,DAC_CHANNEL_D,dac_out);
 
+			  HAL_SPI_Transmit(&hspi3,&dat_out[0],2,10);
+
+			  HAL_GPIO_WritePin(SPI3_RCLK_GPIO_Port,SPI3_RCLK_Pin,GPIO_PIN_RESET);
+			  HAL_GPIO_WritePin(SPI3_RCLK_GPIO_Port,SPI3_RCLK_Pin,GPIO_PIN_SET);
 		}
+	}
+	// Update DACs
+	if(htim->Instance==TIM6){
+		 /*
+
+		  */
 	}
 	// Update gui
 	if(htim->Instance==TIM10){
@@ -176,6 +210,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		sequencer.readWrite();
 		sequencer.stepSwitches.update(clock.sub);
 		sequencer.menuSwitches.update(clock.sub);
+		encoder.update(HAL_GPIO_ReadPin(ENC1A_GPIO_Port,ENC1A_Pin),HAL_GPIO_ReadPin(ENC1B_GPIO_Port,ENC1B_Pin));
 	}
 }
 
@@ -213,71 +248,53 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM10_Init();
+  MX_TIM6_Init();
   MX_SPI2_Init();
   MX_I2C1_Init();
+  MX_SPI3_Init();
+  MX_USB_DEVICE_Init();
+
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start_IT(&htim5);
   HAL_TIM_OC_Start_IT(&htim5,TIM_CHANNEL_2);
-
   clock.setTimer(&htim2,&htim5);
   clock.setSource(INTERNAL);
-  clock.setPeriod(5000000);
+  clock.setPeriod(4000000);
   clock.setSlaveDivision(192);
+
+  shiftRegInit();
 
   HAL_TIM_Base_Start_IT(&htim10);
 
-  shiftRegInit();
-  // editSwitches.setLedAll(FULL,PULSE_MODE_8TH);
+  display.initialize(&hspi2,DOGL128);
+  display.contrast(14);
 
-  char stringTx[32];
-  sprintf((char*)stringTx,"HELLO WORLD!");
-  HAL_UART_Transmit(&huart2,(uint8_t*)stringTx,32,10);
+  //display.clear();
 
-  System_Init();
+ display.string(1,7,font_6x8,"0123456789abcdefghik0");
+ display.rectangle(0,7,0,7,0b11111111);
+ display.rectangle(127,7,127,7,0b11111111);
+ display.rectangle(0,6,127,6,0x80);
+  //display.rectangle(71,2,127,2,0x03);
+  //display.view(VIEW_BOTTOM);
 
-  OLED_Init(SCAN_DIR_DFT);//SCAN_DIR_DFT = D2U_L2R
+ io.initDacs(RANGE_PLUS_5);
 
-  GUI_DrawRectangle(1,1,30,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DisString_EN(5, 5, "PLAY", &Font8, FONT_BACKGROUND, WHITE);
+ //HAL_TIM_Base_Start_IT(&htim6);
 
-  GUI_DrawRectangle(32,1,62,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DrawRectangle(64,1,94,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DrawRectangle(96,1,126,30,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-
-  GUI_DrawRectangle(1,32,30,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DrawRectangle(32,32,62,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DrawRectangle(64,32,94,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-  GUI_DrawRectangle(96,32,126,62,0xF,DRAW_EMPTY,DOT_PIXEL_1X1);
-
-  GUI_DisString_EN(5 , 52, "DELTRONIX", &Font8, FONT_BACKGROUND, WHITE);
-
-
-  OLED_Display();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
- unsigned int temp;
-
   while (1)
   {
-	  if((temp != clock.sub)){
-			char stringTx[32];
-
-			if (!clock.sub){
-			OLED_ClearWindow(0,60,127,90,0);
-			stringTx[0]='\0';
-			sprintf((char*)stringTx," M: %d S: %d",clock.master,clock.sub);
-			GUI_DisString_EN(5,62, stringTx, &Font8, FONT_BACKGROUND, WHITE);
-
-			OLED_DisWindow(0, 60, 127, 90);
-			}
-	  }
 
 
+
+
+	  HAL_Delay(1);
 
     /* USER CODE END WHILE */
 
@@ -301,15 +318,14 @@ void SystemClock_Config(void)
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
   /**Initializes the CPU, AHB and APB busses clocks 
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = 4;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -328,7 +344,6 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 }
-
 /**
   * @brief I2C1 Initialization Function
   * @param None
@@ -421,10 +436,10 @@ static void MX_SPI2_Init(void)
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -438,6 +453,47 @@ static void MX_SPI2_Init(void)
   /* USER CODE END SPI2_Init 2 */
 
 }
+
+
+/**
+  * @brief SPI3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI3_Init(void)
+{
+
+  /* USER CODE BEGIN SPI3_Init 0 */
+
+  /* USER CODE END SPI3_Init 0 */
+
+  /* USER CODE BEGIN SPI3_Init 1 */
+
+  /* USER CODE END SPI3_Init 1 */
+  /* SPI3 parameter configuration*/
+  hspi3.Instance = SPI3;
+  hspi3.Init.Mode = SPI_MODE_MASTER;
+  hspi3.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi3.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi3.Init.NSS = SPI_NSS_SOFT;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi3.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI3_Init 2 */
+
+  /* USER CODE END SPI3_Init 2 */
+
+}
+
+
 
 /**
   * @brief TIM2 Initialization Function
@@ -460,9 +516,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 41;
+  htim2.Init.Prescaler = 83;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4000000000;
+  htim2.Init.Period = 4000000000UL;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
@@ -530,7 +586,7 @@ static void MX_TIM5_Init(void)
 
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 41;
+  htim5.Init.Prescaler = 83;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim5.Init.Period = 4000000000;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -572,6 +628,37 @@ static void MX_TIM5_Init(void)
   /* USER CODE END TIM5_Init 2 */
 
 }
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 83;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 500;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
 
 /**
   * @brief TIM10 Initialization Function
@@ -589,7 +676,7 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 41;
+  htim10.Init.Prescaler = 83;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 800;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -646,32 +733,49 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, LD_Pin|RCLK_Pin|SRCLR_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, OUT1_Pin|OUT2_Pin|OUT3_Pin|OLED_DC_Pin 
-                          |OLED_RST_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, OUT1_Pin|OUT2_Pin|OUT3_Pin|DISP_RST_Pin
+                          |DISP_A0_Pin|DISP_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LD_Pin RCLK_Pin SRCLR_Pin */
-  GPIO_InitStruct.Pin = LD_Pin|RCLK_Pin|SRCLR_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, SPI3_RCLK_Pin|SPI3_DAC_SYNC_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : ENC1A_Pin ENC1B_Pin */
+  GPIO_InitStruct.Pin = ENC1A_Pin|ENC1B_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RCLK_Pin */
+  GPIO_InitStruct.Pin = RCLK_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_Init(RCLK_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : OUT1_Pin OUT2_Pin OUT3_Pin OLED_DC_Pin 
-                           OLED_RST_Pin */
-  GPIO_InitStruct.Pin = OUT1_Pin|OUT2_Pin|OUT3_Pin|OLED_DC_Pin 
-                          |OLED_RST_Pin;
+  /*Configure GPIO pins : OUT1_Pin OUT2_Pin OUT3_Pin DISP_RST_Pin
+                           DISP_A0_Pin DISP_CS_Pin */
+  GPIO_InitStruct.Pin = OUT1_Pin|OUT2_Pin|OUT3_Pin|DISP_RST_Pin
+                          |DISP_A0_Pin|DISP_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SPI3_RCLK_Pin SPI3_DAC_SYNC_Pin */
+  GPIO_InitStruct.Pin = SPI3_RCLK_Pin|SPI3_DAC_SYNC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 

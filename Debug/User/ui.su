@@ -1,24 +1,27 @@
 new:146:14:void* operator new(std::size_t, void*)	16	static
 new:152:13:void operator delete(void*, void*)	16	static
 ui.cpp:14:6:void shiftRegInit()	8	static
-ui.cpp:20:1:Switches::Switches(uint8_t, uint8_t, uint8_t, SPI_HandleTypeDef*)	56	static
-ui.cpp:40:1:Switches::~Switches()	16	static
-ui.cpp:44:6:void Switches::spi()	24	static
-ui.cpp:65:6:void Switches::update(int)	88	dynamic
-ui.cpp:145:6:bool Switches::hasChanged()	24	static
-ui.cpp:155:9:uint8_t Switches::firstChanged()	24	static
-ui.cpp:166:9:uint8_t Switches::returnPressed(uint8_t)	24	static
-ui.cpp:170:6:bool Switches::pressed()	32	static
-ui.cpp:181:6:bool Switches::released()	32	static
-ui.cpp:191:9:uint8_t Switches::released(uint8_t)	24	static
-ui.cpp:197:6:void Switches::currentState(uint8_t*)	32	static
-ui.cpp:202:6:void Switches::setLed(int, PWM_MODE)	24	static
-ui.cpp:205:6:void Switches::setLed(int, PWM_MODE, PULSE_MODE)	24	static
-ui.cpp:210:6:void Switches::setLedArray(int, int, uint8_t*, PWM_MODE, PULSE_MODE)	40	static
-ui.cpp:221:6:void Switches::setLedByte(int, uint8_t, PWM_MODE, PULSE_MODE)	32	static
-ui.cpp:230:6:void Switches::setLedAll(PWM_MODE)	24	static
-ui.cpp:236:6:void Switches::setLedAll(PULSE_MODE)	24	static
-ui.cpp:242:6:void Switches::setLedAll(PWM_MODE, PULSE_MODE)	24	static
+ui.cpp:18:1:Encoder::Encoder(uint8_t)	16	static
+ui.cpp:21:1:Encoder::~Encoder()	16	static
+ui.cpp:24:6:void Encoder::update(uint8_t, uint8_t)	24	static
+ui.cpp:68:1:Switches::Switches(uint8_t, uint8_t, uint8_t, SPI_HandleTypeDef*)	56	static
+ui.cpp:88:1:Switches::~Switches()	16	static
+ui.cpp:92:6:void Switches::spi()	24	static
+ui.cpp:99:6:void Switches::update(int)	88	dynamic
+ui.cpp:174:6:bool Switches::hasChanged()	24	static
+ui.cpp:184:9:uint8_t Switches::firstChanged()	24	static
+ui.cpp:195:9:uint8_t Switches::returnPressed(uint8_t)	24	static
+ui.cpp:199:6:bool Switches::pressed()	32	static
+ui.cpp:210:6:bool Switches::released()	32	static
+ui.cpp:220:9:uint8_t Switches::released(uint8_t)	24	static
+ui.cpp:226:6:void Switches::currentState(uint8_t*)	32	static
+ui.cpp:231:6:void Switches::setLed(int, PWM_MODE)	24	static
+ui.cpp:234:6:void Switches::setLed(int, PWM_MODE, PULSE_MODE)	24	static
+ui.cpp:239:6:void Switches::setLedArray(int, int, uint8_t*, PWM_MODE, PULSE_MODE)	40	static
+ui.cpp:250:6:void Switches::setLedByte(int, uint8_t, PWM_MODE, PULSE_MODE)	32	static
+ui.cpp:259:6:void Switches::setLedAll(PWM_MODE)	24	static
+ui.cpp:265:6:void Switches::setLedAll(PULSE_MODE)	24	static
+ui.cpp:271:6:void Switches::setLedAll(PWM_MODE, PULSE_MODE)	24	static
 stl_vector.h:255:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = unsigned char; _Alloc = std::allocator<unsigned char>]	16	static
 stl_vector.h:425:7:std::vector<_Tp, _Alloc>::~vector() [with _Tp = unsigned char; _Alloc = std::allocator<unsigned char>]	24	static
 stl_vector.h:255:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = std::vector<unsigned char>; _Alloc = std::allocator<std::vector<unsigned char> >]	16	static

@@ -34,7 +34,7 @@ public:
 	ClockSource clockSource;
 	bool lockState;
 
-	volatile unsigned int period, subDiv, master, sub;
+	volatile unsigned int period, subDiv, subMult, master, sub;
 	unsigned int averagedPeriod;
 	unsigned int lastCounterValue;
 
@@ -60,6 +60,7 @@ public:
 	volatile unsigned int getPeriod(void);
 
 	void setSlaveDivision(unsigned int division);
+	void setSlaveMultiplier(unsigned int multiplier);
 	void setSource(ClockSource source);
 
 	// Increment master clock;

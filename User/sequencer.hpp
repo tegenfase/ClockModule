@@ -24,8 +24,8 @@ const uint8_t PLAY = (1 << 0);
 const uint8_t PAUSE = (1 << 1);
 const uint8_t COPY = (1 << 2);
 const uint8_t PASTE = (1 << 3);
-const uint8_t SELECT_BLOCK = (1 << 4);
-const uint8_t SELECT_LANE = (1 << 5);
+const uint8_t SELECT_LANE = (1 << 4);
+const uint8_t SELECT_BLOCK = (1 << 5);
 const uint8_t SELECT_NOTE = (1 << 6);
 const uint8_t SELECT_SONG = (1 << 7);
 
@@ -66,7 +66,7 @@ struct Song{
 
 	// 16 lanes, 16 blocks, 16 notes with 24 subdivisions + 8 leftover bits?
 	uint32_t subSteps[16][16][16];
-
+	uint16_t notes[16][16][16];
 };
 
 class Sequencer{
@@ -77,10 +77,10 @@ public:
 	uint16_t playingLanes;
 	uint16_t mutedLanes;
 
-	TRANSPORT_STATE transportState;
+	TRANSPORT_STATE transportState = TRANSPORT_STATE_PLAY;
 	TRANSPORT_MODE transportMode;
 
-	STEPSWITCH_MODE stepSwitchMode;
+	STEPSWITCH_MODE stepSwitchMode = STEPSWITCH_EDIT_BLOCK;
 
 
 	Song song[2];

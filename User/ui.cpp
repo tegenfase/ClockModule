@@ -12,10 +12,58 @@ uint8_t ui_spi_in[NUM_OF_REGISTERS];
 uint8_t ui_spi_out[NUM_OF_REGISTERS];
 
 void shiftRegInit(void){
-	HAL_GPIO_WritePin(SRCLR_GPIO_Port,SRCLR_Pin,GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_SET);
 	HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
 }
+
+Encoder::Encoder(uint8_t nStates){
+	numOfStates = nStates;
+}
+Encoder::~Encoder(){
+	;
+}
+void Encoder::update(uint8_t pinA, uint8_t pinB){
+	bool oldStateA, oldStateB;
+
+	if(!pinA){
+		bufferA |= (1 << index);
+	}
+	else{
+		bufferA &= ~(1 << index);
+	}
+
+	if(!pinB){
+		bufferB |= (1 << index);
+
+	}
+	else{
+		bufferB &= ~(1 << index);
+	}
+
+	oldStateA=debouncedStateA;
+	oldStateB=debouncedStateB;
+
+	if(bufferA == 0xFF){debouncedStateA = 1;}
+	else if(bufferA == 0){debouncedStateA = 0;}
+	if(bufferB == 0xFF){debouncedStateB = 1;}
+	else if(bufferB == 0){debouncedStateB = 0;}
+
+	if(debouncedStateA && debouncedStateB){
+		if(debouncedStateA != oldStateA){
+			counter++;
+		}
+		if(debouncedStateB != oldStateB){
+			counter--;
+		}
+	}
+
+	if(index < numOfStates){
+		index ++;
+	}
+	else{
+		index = 0;
+	}
+}
+
 // Switch debouncer
 Switches::Switches(uint8_t nRegisters, uint8_t nStates, uint8_t srOffset, SPI_HandleTypeDef* spi){
 	numOfRegisters = nRegisters;
@@ -42,25 +90,11 @@ Switches::~Switches(void){
 }
 
 void Switches::spi(void){
-		// Clear output shift register, unnecessary...
-		// HAL_GPIO_WritePin(SRCLR_GPIO_Port,SRCLR_Pin,GPIO_PIN_RESET);
-		// HAL_GPIO_WritePin(SRCLR_GPIO_Port,SRCLR_Pin,GPIO_PIN_SET);
-
-		// Latch inputs
-
-
-
 		HAL_SPI_TransmitReceive(spi_interface, ui_spi_out, ui_spi_in, NUM_OF_REGISTERS, 10);
-
 		// Transfer shift register contents to storage register
-
 		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
-
 		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(LD_GPIO_Port,LD_Pin,GPIO_PIN_SET);
-
-
+		HAL_GPIO_WritePin(RCLK_GPIO_Port, RCLK_Pin,GPIO_PIN_SET);
 }
 void Switches::update(int subTick){
 
@@ -74,8 +108,6 @@ void Switches::update(int subTick){
 	if(++PWMcounter >= 64){
 		PWMcounter = 1;
 	}
-
-
 
 	for(x = 0; x < numOfRegisters; x++){
 		// Dim and pulse leds
@@ -114,8 +146,6 @@ void Switches::update(int subTick){
 
 		}
 
-
-
 		// Push ledstate to spi out buffer
 		ui_spi_out[NUM_OF_REGISTERS-(1+offset+x)] = ledMask[x];
 
@@ -136,7 +166,6 @@ void Switches::update(int subTick){
 		}
 
 		changed[x] = debouncedState[x] ^ lastDebouncedState[x];
-
 	}
 }
 

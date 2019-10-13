@@ -129,7 +129,7 @@ void Sequencer::readWrite(void){
 				}
 				else if(song[selectedSong].subSteps[selectedLane][selectedBlock][step]){
 					if(step == selectedStep){
-						stepSwitches.setLed(selectedStep,HALF,PULSE_MODE_8TH);
+						stepSwitches.setLed(selectedStep,HALF,PULSE_MODE_16TH);
 					}
 					else{
 						stepSwitches.setLed(step,HALF);
@@ -152,7 +152,6 @@ void Sequencer::readWrite(void){
 }
 // Advance to next step depending on playState
 void Sequencer::subStepAdvance(Clock* clock){
-	char uartBuffer[16];
 	switch(transportState){
 	case TRANSPORT_STATE_PLAY:
 		song[playingSong].activeSubStep=clock->sub%12;
@@ -217,8 +216,8 @@ void Sequencer::writeTrigPattern(void){
 		}
 		char uartTrigger = 0;
 		for(int i = 0; i < 8; i++){
-			step = song[playingSong].activeStep[i+8];
-			if((song[playingSong].subSteps[i+8][playingBlock][step]) & (1 <<  song[playingSong].activeSubStep)){
+			step = song[playingSong].activeStep[i];
+			if((song[playingSong].subSteps[i][playingBlock][step]) & (1 <<  song[playingSong].activeSubStep)){
 				uartTrigger |= (1 << i);
 
 			}

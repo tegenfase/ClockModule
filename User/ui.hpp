@@ -14,7 +14,7 @@
 #ifndef UI_HPP_
 #define UI_HPP_
 
-#define NUM_OF_REGISTERS 3
+#define NUM_OF_REGISTERS 4
 
 void shiftRegInit(void);
 
@@ -32,7 +32,22 @@ enum PULSE_MODE{
 	PULSE_MODE_4TH = 8,
 	PULSE_MODE_2ND = 16
 };
+class Encoder{
+public:
+	uint8_t numOfStates;
+	uint8_t index;
+	uint8_t bufferA;
+	uint8_t bufferB;
+	bool debouncedStateA, debouncedStateB;
+	bool changed;
 
+	uint16_t timer;
+	int16_t counter;
+	Encoder(uint8_t nStates);
+	~Encoder();
+	void update(uint8_t pinA, uint8_t pinB);
+
+};
 
 class Switches{
 public:
@@ -60,6 +75,7 @@ public:
 	void readWriteRegisters(void);
 
 	void spi(void);
+	// Latch inputs
 	void update(int subTick);
 
 	void setLed(int n, PWM_MODE pwm);
